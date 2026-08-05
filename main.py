@@ -5,25 +5,35 @@ historic `main` import path and console script target working.
 """
 
 import os
+import sys
 
-# ۱. ست کردن دامنه دقیق و عمومی قبل از هرگونه Import
-RAILWAY_DOMAIN = "telegram-mcp-production-7c4b.up.railway.app"
-ALLOWED_DOMAINS = f"{RAILWAY_DOMAIN},localhost,127.0.0.1,*"
-
-os.environ["MCP_ALLOWED_HOSTS"] = ALLOWED_DOMAINS
-os.environ["FASTMCP_ALLOWED_HOSTS"] = ALLOWED_DOMAINS
-os.environ["ALLOWED_HOSTS"] = ALLOWED_DOMAINS
+# ۱. ست کردن متغیرهای محیطی عمومی
+os.environ["MCP_ALLOWED_HOSTS"] = "*"
+os.environ["FASTMCP_ALLOWED_HOSTS"] = "*"
+os.environ["ALLOWED_HOSTS"] = "*"
 os.environ["UVICORN_FORWARDED_ALLOW_IPS"] = "*"
 os.environ["UVICORN_PROXY_HEADERS"] = "true"
 
-# ۲. خنثی‌سازی مستقیم اعتبارسنجی Host در ماژول امنیتی MCP پایتون
+# ۲. خنثی‌سازی کامل و هم‌زمان توابع اعتبارسنجی Host در transport_security و sse
+def _bypass_security(*args, **kwargs):
+    return True
+
+def _bypass_validate(*args, **kwargs):
+    return None
+
 try:
     import mcp.server.transport_security as ts
-    if hasattr(ts, "check_host_header"):
-        ts.check_host_header = lambda *args, **kwargs: True
-    if hasattr(ts, "ALLOWED_HOSTS") and isinstance(ts.ALLOWED_HOSTS, set):
-        ts.ALLOWED_HOSTS.add(RAILWAY_DOMAIN)
-        ts.ALLOWED_HOSTS.add("*")
+    for attr in ["check_host_header", "validate_host", "is_valid_host", "validate_request", "check_origin"]:
+        if hasattr(ts, attr):
+            setattr(ts, attr, _bypass_security if ("is" in attr or "check" in attr) else _bypass_validate)
+except Exception:
+    pass
+
+try:
+    import mcp.server.sse as sse_mod
+    for attr in ["check_host_header", "validate_host", "is_valid_host", "validate_request", "check_origin"]:
+        if hasattr(sse_mod, attr):
+            setattr(sse_mod, attr, _bypass_security if ("is" in attr or "check" in attr) else _bypass_validate)
 except Exception:
     pass
 
