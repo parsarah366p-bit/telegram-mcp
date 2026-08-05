@@ -68,13 +68,13 @@ import os
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     
-    # تنظیم متغیرهای محیطی FastMCP و آزاد کردن تمام دامنه‌ها
+    # تنظیم متغیرهای محیطی برای FastMCP و Uvicorn
     os.environ["FASTMCP_HOST"] = "0.0.0.0"
     os.environ["FASTMCP_PORT"] = str(port)
-    os.environ["FASTMCP_ALLOWED_HOSTS"] = "*"
+    os.environ["UVICORN_FORWARDED_ALLOW_IPS"] = "*"
+    os.environ["UVICORN_PROXY_HEADERS"] = "true"
     
     mcp.settings.host = "0.0.0.0"
     mcp.settings.port = port
-    mcp.settings.allowed_hosts = ["*"]
     
     mcp.run(transport="sse")
