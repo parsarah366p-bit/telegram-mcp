@@ -63,5 +63,8 @@ def _configure_allowed_roots_from_cli(argv=None) -> None:
     globals()["SERVER_ALLOWED_ROOTS"] = _runtime.SERVER_ALLOWED_ROOTS
 
 
+import os
+
 if __name__ == "__main__":
-    main()
+    port = int(os.environ.get("PORT", 8000))
+    mcp.run(transport="sse", host="0.0.0.0", port=port)
