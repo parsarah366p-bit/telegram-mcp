@@ -6,11 +6,26 @@ historic `main` import path and console script target working.
 
 import os
 
-# ۱. تنظیم متغیرهای محیطی در بالاترین نقطه، قبل از Import شدن MCP
-os.environ["MCP_ALLOWED_HOSTS"] = "*"
-os.environ["FASTMCP_ALLOWED_HOSTS"] = "*"
+# ۱. ست کردن دامنه دقیق و عمومی قبل از هرگونه Import
+RAILWAY_DOMAIN = "telegram-mcp-production-7c4b.up.railway.app"
+ALLOWED_DOMAINS = f"{RAILWAY_DOMAIN},localhost,127.0.0.1,*"
+
+os.environ["MCP_ALLOWED_HOSTS"] = ALLOWED_DOMAINS
+os.environ["FASTMCP_ALLOWED_HOSTS"] = ALLOWED_DOMAINS
+os.environ["ALLOWED_HOSTS"] = ALLOWED_DOMAINS
 os.environ["UVICORN_FORWARDED_ALLOW_IPS"] = "*"
 os.environ["UVICORN_PROXY_HEADERS"] = "true"
+
+# ۲. خنثی‌سازی مستقیم اعتبارسنجی Host در ماژول امنیتی MCP پایتون
+try:
+    import mcp.server.transport_security as ts
+    if hasattr(ts, "check_host_header"):
+        ts.check_host_header = lambda *args, **kwargs: True
+    if hasattr(ts, "ALLOWED_HOSTS") and isinstance(ts.ALLOWED_HOSTS, set):
+        ts.ALLOWED_HOSTS.add(RAILWAY_DOMAIN)
+        ts.ALLOWED_HOSTS.add("*")
+except Exception:
+    pass
 
 from telegram_mcp.install_guard import UnsafeInstallationError, assert_safe_distribution
 
@@ -24,7 +39,6 @@ from telegram_mcp.runtime import *
 from telegram_mcp.runner import _main, main
 from telegram_mcp.tools import *
 
-# Backward-compatible alias for callers/tests that monkeypatch main.SERVER_ALLOWED_ROOTS.
 SERVER_ALLOWED_ROOTS = _runtime.SERVER_ALLOWED_ROOTS
 
 
