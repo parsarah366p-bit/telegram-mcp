@@ -23,7 +23,6 @@ ADMIN_USER_ID = 588588275
 
 ai_engine = AIEngine(knowledge_base_path="knowledge_base.json")
 
-# Configure Telethon as a standard Telegram Desktop Linux Client for maximum stability on Railway
 client = TelegramClient(
     StringSession(SESSION_STRING),
     API_ID,
@@ -77,41 +76,56 @@ async def handle_client_dm(event):
         if not message_text:
             return
             
+        # Compute live uptime string
+        uptime = datetime.now() - stats["start_time"]
+        hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        uptime_str = f"{hours}h {minutes}m {seconds}s"
+        
         # ==========================================
-        # 👑 ADMIN HANDLER FOR @lirph
+        # 👑 ADMIN HANDLER FOR @lirph (AI Co-Pilot)
         # ==========================================
         if sender_id == ADMIN_USER_ID or username == ADMIN_USERNAME:
-            logging.info(f"Admin @{ADMIN_USERNAME} command received: '{message_text}'")
+            logging.info(f"Admin @{ADMIN_USERNAME} message: '{message_text}'")
             
-            uptime = datetime.now() - stats["start_time"]
-            hours, remainder = divmod(int(uptime.total_seconds()), 3600)
-            minutes, seconds = divmod(remainder, 60)
-            uptime_str = f"{hours}h {minutes}m {seconds}s"
-            
-            active_chats = len(ai_engine.conversations)
-            num_keys = len(ai_engine.gemini_keys)
-            
-            report_text = (
-                f"👑 **ADMIN CONTROL PANEL (@{ADMIN_USERNAME})**\n\n"
-                f"🟢 **Bot Status**: Active 24/7 (Gemini AI Key Pool)\n"
-                f"⏱ **Uptime**: `{uptime_str}`\n"
-                f"🔑 **Active Gemini Keys Pool**: `{num_keys} Keys`\n"
-                f"💬 **Active Client Conversations**: `{active_chats}`\n"
-                f"📩 **Total Client Messages Handled**: `{stats['total_messages']}`\n"
-                f"🚨 **Total Human Escalations Triggered**: `{stats['escalations_count']}`\n\n"
-            )
-            
-            if stats["recent_escalations"]:
-                report_text += "📌 **Recent Client Escalations**:\n"
-                for esc in stats["recent_escalations"][-5:]:
-                    report_text += f"- **{esc['name']}** ({esc['username']}): `{esc['text']}` (Reason: {esc['reason']})\n"
-            else:
-                report_text += "✨ No pending client escalation alerts.\n"
+            # Explicit Telemetry Dashboard Slash Commands
+            if message_text.lower() in ["/report", "/stats", "/dashboard"]:
+                active_chats = len(ai_engine.conversations)
+                num_keys = len(ai_engine.gemini_keys)
                 
-            report_text += "\n💡 *Send any message anytime to get live updates and reports.*"
+                report_text = (
+                    f"👑 **ADMIN CONTROL PANEL (@{ADMIN_USERNAME})**\n\n"
+                    f"🟢 **Bot Status**: Active 24/7 (Gemini AI Key Pool)\n"
+                    f"⏱ **Uptime**: `{uptime_str}`\n"
+                    f"🔑 **Active Gemini Keys Pool**: `{num_keys} Keys`\n"
+                    f"💬 **Active Client Conversations**: `{active_chats}`\n"
+                    f"📩 **Total Client Messages Handled**: `{stats['total_messages']}`\n"
+                    f"🚨 **Total Human Escalations Triggered**: `{stats['escalations_count']}`\n\n"
+                )
+                
+                if stats["recent_escalations"]:
+                    report_text += "📌 **Recent Client Escalations**:\n"
+                    for esc in stats["recent_escalations"][-5:]:
+                        report_text += f"- **{esc['name']}** ({esc['username']}): `{esc['text']}` (Reason: {esc['reason']})\n"
+                else:
+                    report_text += "✨ No pending client escalation alerts.\n"
+                    
+                report_text += "\n💡 *Chat naturally anytime to ask questions, request summaries, or discuss business!*"
+                
+                await event.reply(report_text)
+                return
             
-            await event.reply(report_text)
-            return
+            # Conversational Executive AI Response for Admin
+            async with client.action(event.chat_id, "typing"):
+                stats_summary = {
+                    "uptime": uptime_str,
+                    "total_messages": stats["total_messages"],
+                    "escalations_count": stats["escalations_count"],
+                    "recent_escalations": stats["recent_escalations"]
+                }
+                admin_reply = ai_engine.generate_admin_response("پارسا", message_text, stats_summary)
+                await event.reply(admin_reply)
+                return
 
         # ==========================================
         # 🤖 CLIENT DM HANDLER (Gemini AI Engine)

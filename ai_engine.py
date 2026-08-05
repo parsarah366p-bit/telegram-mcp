@@ -22,8 +22,6 @@ class AIEngine:
         self.knowledge_base_path = knowledge_base_path
         self.knowledge_base = self._load_knowledge_base()
         
-        # Load API keys from environment variable GEMINI_API_KEYS (comma-separated)
-        # Fallback to full 9-key pool automatically
         keys_env = os.getenv("GEMINI_API_KEYS", "")
         if keys_env:
             self.gemini_keys = [k.strip() for k in keys_env.split(",") if k.strip()]
@@ -33,8 +31,8 @@ class AIEngine:
         self.models = ["gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]
         self.current_key_idx = 0
         
-        # Per-user conversation memory
         self.conversations = {}
+        self.admin_conversations = []
         
         self.ssl_context = ssl.create_default_context()
         self.ssl_context.check_hostname = False
@@ -121,6 +119,42 @@ class AIEngine:
             "needs_escalation": needs_escalation,
             "reason": reason
         }
+
+    def generate_admin_response(self, admin_name: str, message_text: str, stats_data: dict) -> str:
+        uptime = stats_data.get("uptime", "در حال فعالیت")
+        total_msgs = stats_data.get("total_messages", 0)
+        escalations = stats_data.get("escalations_count", 0)
+        recent_esc = stats_data.get("recent_escalations", [])
+        
+        system_instruction = f"""شما «دستیار ارشد و کوپایلوت هوشمند مدیر ارشد، {admin_name} (پارسا)» هستید.
+لحن شما: صمیمی، حرفه‌ای، خفن، هوشمند و کاملاً مسلط.
+
+اطلاعات و وضعیت لحظه‌ای سیستم شما:
+- آپتایم و وضعیت: {uptime}
+- کل پیام‌های دریافتی از مشتریان: {total_msgs}
+- کل ارجاعات انسانی (Escalations): {escalations}
+- تعداد کلیدهای فعال Gemini: {len(self.gemini_keys)}
+- تعداد چت‌های فعال مشتریان: {len(self.conversations)}
+
+آخرین گزارش‌های ارجاع انسانی مشتریان:
+{json.dumps(recent_esc, ensure_ascii=False, indent=2) if recent_esc else "هیچ ارجاع جدیدی ثبت نشده است."}
+
+وظایف شما در گفتگو با {admin_name}:
+۱. مانند یک رفیق و دستیار هوشمند، به هر سوال یا گپ و گفت {admin_name} پاسخ کامل و پرانرژی بدهید.
+۲. اگر درباره مشتریان، آمار، استراتژی یا توسعه سوال کرد، راهنمایی دقیق و کاربردی ارائه کنید.
+۳. همیشه پاسخ‌ها روان، شیک و بدون کدهای اضافی باشد.
+"""
+        self.admin_conversations.append({"role": "user", "content": message_text})
+        if len(self.admin_conversations) > 10:
+            self.admin_conversations = self.admin_conversations[-10:]
+            
+        reply_text = self._call_gemini_pool(system_instruction, self.admin_conversations)
+        
+        if not reply_text:
+            reply_text = f"سلام {admin_name} جان! سیستم در حال حاضر ۱۰۰٪ پایداره و به پیام‌های مشتریان پاسخ می‌ده. چطور می‌تونم کمکت کنم؟ 👑"
+            
+        self.admin_conversations.append({"role": "assistant", "content": reply_text})
+        return reply_text
 
     def _call_gemini_pool(self, system_instruction, history):
         if not self.gemini_keys:
