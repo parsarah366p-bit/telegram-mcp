@@ -75,15 +75,20 @@ class AIEngine:
         few_shots = cfg.get("few_shot_examples", [])
         custom_rules = self.knowledge_base.get("custom_rules", [])
         
+        openers_str = ", ".join(style.get("key_openers", ["حاجی", "داش", "دا", "باع", "باو"]))
+        slang_str = ", ".join(style.get("frequent_slang", ["کیر توش", "حق", "فشاری شدم", "دیوانم کرد", "کصخل", "مختصر مفید", "ردیف"]))
+        emojis_str = ", ".join(style.get("frequent_emojis", ["😭", "😂", "🌟", "👤", "😵‍💫", "🥰", "❤️"]))
+        voice_str = style.get("voice_message_behavior", "اگر مخاطب ابراز گشادیسم یا خستگی از تایپ کرد، بگو ویس بده یا بگو حس تایپ نیست ویس میدم.")
+        
         instruction = f"""{sys_inst}
 
 قوانین حیاتی و الزامی ساختار (CRITICAL CONSTRAINTS):
 ۱. فرمت پیام (Formatting): هرگز یک پاراگراف طولانی یا پیام نصفه‌کاره نفرستید. حتماً پاسخ خود را به ۲ تا ۵ خط بسیار کوتاه و شکسته (با n\\ برای شکستن خط) تقسیم کنید. همیشه تمام جملات را کاملاً کامل و بدون قطع شدن در وسط کلمه پایان دهید.
 ۲. زبان و لحن (Language & Tone): فارسی عامیانه کف خیابون تهرانی همراه با اصطلاحات کوتاه انگلیسی (گیم، آرت، هوش مصنوعی، تِک).
-۳. تکیه‌کلام‌های شروع: {", ".join(style.get("key_openers", ["حاجی", "داش", "دا", "باع", "باو"]))}
-۴. کلمات و اصطلاحات متداول: {", ".join(style.get("frequent_slang", ["کیر توش", "حق", "فشاری شدم", "دیوانم کرد", "کصخل", "مختصر مفید", "ردیف"]))}
-۵. اموجی‌های محبوب: {", ".join(style.get("frequent_emojis", ["😭", "😂", "🌟", "👤", "😵‍💫", "🥰", "❤️"])}
-۶. رفتار درباره وویس (Voice Behavior): {style.get("voice_message_behavior", "اگر مخاطب ابراز گشادیسم یا خستگی از تایپ کرد، بگو ویس بده یا بگو حس تایپ نیست ویس میدم.")}
+۳. تکیه‌کلام‌های شروع: {openers_str}
+۴. کلمات و اصطلاحات متداول: {slang_str}
+۵. اموجی‌های محبوب: {emojis_str}
+۶. رفتار درباره وویس (Voice Behavior): {voice_str}
 
 علاقه‌مندی‌ها و موضوعات هویت پارسا:
 - {", ".join(context.get("interests", []))}
@@ -130,7 +135,6 @@ class AIEngine:
         }
 
     def generate_admin_response(self, admin_name: str, message_text: str, stats_data: dict) -> str:
-        # Admin gets full natural conversational Twin responses as well!
         return self.generate_response(999999, admin_name, message_text)["reply"]
 
     def _call_gemini_pool(self, system_instruction, history):
