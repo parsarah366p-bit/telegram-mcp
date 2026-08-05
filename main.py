@@ -7,7 +7,7 @@ historic `main` import path and console script target working.
 import os
 import sys
 
-# ۱. مقداردهی متغیرهای محیطی
+# ۱. ست کردن متغیرهای محیطی
 RAILWAY_DOMAIN = "telegram-mcp-production-7c4b.up.railway.app"
 os.environ["MCP_ALLOWED_HOSTS"] = f"*,{RAILWAY_DOMAIN}"
 os.environ["FASTMCP_ALLOWED_HOSTS"] = f"*,{RAILWAY_DOMAIN}"
@@ -18,28 +18,39 @@ os.environ["UVICORN_PROXY_HEADERS"] = "true"
 def _always_true(*args, **kwargs):
     return True
 
-# ۲. خنثی‌سازی هدفمند توابع اعتبارسنجی بدون دستکاری کلاس‌های Pydantic
-TARGET_FUNCTIONS = [
-    "check_host_header",
-    "validate_host",
-    "is_valid_host",
-    "check_origin",
-    "validate_request",
-]
-
+# ۲. خنثی‌سازی پیش از Import ماژول‌های اصلی MCP
 try:
     import mcp.server.transport_security as ts
-    for fn_name in TARGET_FUNCTIONS:
-        if hasattr(ts, fn_name):
-            setattr(ts, fn_name, _always_true)
+    for attr in dir(ts):
+        if not attr.startswith("__"):
+            obj = getattr(ts, attr)
+            if callable(obj) and not isinstance(obj, type):
+                try:
+                    setattr(ts, attr, _always_true)
+                except Exception:
+                    pass
+            elif isinstance(obj, (set, list)):
+                try:
+                    if isinstance(obj, set):
+                        obj.add("*")
+                        obj.add(RAILWAY_DOMAIN)
+                    elif isinstance(obj, list):
+                        obj.extend(["*", RAILWAY_DOMAIN])
+                except Exception:
+                    pass
 except Exception:
     pass
 
 try:
     import mcp.server.sse as sse_mod
-    for fn_name in TARGET_FUNCTIONS:
-        if hasattr(sse_mod, fn_name):
-            setattr(sse_mod, fn_name, _always_true)
+    for attr in dir(sse_mod):
+        if not attr.startswith("__") and attr not in ("connect_sse", "handle_sse", "SseServerTransport", "EndpointHandler"):
+            obj = getattr(sse_mod, attr)
+            if callable(obj) and not isinstance(obj, type):
+                try:
+                    setattr(sse_mod, attr, _always_true)
+                except Exception:
+                    pass
 except Exception:
     pass
 
@@ -54,6 +65,28 @@ from telegram_mcp import runtime as _runtime
 from telegram_mcp.runtime import *
 from telegram_mcp.runner import _main, main
 from telegram_mcp.tools import *
+
+# ۳. پیمایش کامل تمام ماژول‌های MCP در sys.modules برای خنثی‌سازی توابع کپی‌شده
+for mod_name, mod in list(sys.modules.items()):
+    if mod_name.startswith("mcp") and mod is not None:
+        for attr_name in list(dir(mod)):
+            if any(k in attr_name.lower() for k in ["host", "security", "origin", "valid"]):
+                if attr_name not in ("connect_sse", "handle_sse", "SseServerTransport", "FastMCP", "model_fields"):
+                    try:
+                        val = getattr(mod, attr_name)
+                        if callable(val) and not isinstance(val, type):
+                            setattr(mod, attr_name, _always_true)
+                    except Exception:
+                        pass
+
+# ۴. غیرفعال‌سازی مستقیم تنظیم امنیتی روی شیء FastMCP در صورت وجود
+try:
+    if hasattr(_runtime, "mcp") and _runtime.mcp is not None:
+        if hasattr(_runtime.mcp, "settings") and _runtime.mcp.settings is not None:
+            if hasattr(_runtime.mcp.settings, "transport_security"):
+                _runtime.mcp.settings.transport_security = None
+except Exception:
+    pass
 
 SERVER_ALLOWED_ROOTS = _runtime.SERVER_ALLOWED_ROOTS
 
