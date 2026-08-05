@@ -33,27 +33,25 @@ stats = {
     "recent_escalations": []
 }
 
-async def _connect_with_retry(client, max_attempts=6):
-    for attempt in range(1, max_attempts + 1):
+async def _connect_with_retry(client):
+    attempt = 0
+    while True:
+        attempt += 1
         try:
             await client.connect()
             if await client.is_user_authorized():
                 return True
         except AuthKeyDuplicatedError:
-            if attempt >= max_attempts:
-                raise
-            delay = min(2**attempt, 12)
-            logging.warning(f"Session busy on another IP (attempt {attempt}/{max_attempts}). Retrying in {delay}s...")
+            delay = min(2 * attempt, 15)
+            logging.warning(f"Session lock active on another replica (attempt {attempt}). Retrying in {delay}s...")
             try:
                 await client.disconnect()
             except Exception:
                 pass
             await asyncio.sleep(delay)
         except Exception as e:
-            if attempt >= max_attempts:
-                raise
-            await asyncio.sleep(3)
-    return False
+            logging.error(f"Connect attempt {attempt} error: {e}")
+            await asyncio.sleep(5)
 
 @client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
 async def handle_client_dm(event):
@@ -155,10 +153,7 @@ async def main():
     print(f"🤖 Autonomous 24/7 AI Client Handler Bot (Admin: @{ADMIN_USERNAME})")
     print("=" * 60)
     
-    connected = await _connect_with_retry(client)
-    if not connected:
-        logging.error("Failed connecting to Telegram after retries.")
-        return
+    await _connect_with_retry(client)
         
     me = await client.get_me()
     print(f"✅ Successfully connected to Telegram as {me.first_name} (@{me.username})")
