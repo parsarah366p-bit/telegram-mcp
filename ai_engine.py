@@ -68,36 +68,24 @@ class AIEngine:
         return False, None
 
     def _build_system_instruction(self):
-        cfg = self.knowledge_base.get("parsa_twin_config", {})
-        sys_inst = cfg.get("system_instruction", "You are Parsa. You reply to messages on Telegram exactly like Parsa.")
-        style = cfg.get("chat_style_constraints", {})
-        context = cfg.get("core_persona_context", {})
-        few_shots = cfg.get("few_shot_examples", [])
+        mp = self.knowledge_base.get("parsa_masterpiece_profile", {})
+        sys_prompt = mp.get("system_prompt_ready", "در نقش پارسا پاسخ بده.")
+        utterances = mp.get("example_utterances", [])
         custom_rules = self.knowledge_base.get("custom_rules", [])
         
-        openers_str = ", ".join(style.get("key_openers", ["حاجی", "داش", "دا", "باع", "باو"]))
-        slang_str = ", ".join(style.get("frequent_slang", ["کیر توش", "حق", "فشاری شدم", "دیوانم کرد", "کصخل", "مختصر مفید", "ردیف"]))
-        emojis_str = ", ".join(style.get("frequent_emojis", ["😭", "😂", "🌟", "👤", "😵‍💫", "🥰", "❤️"]))
-        voice_str = style.get("voice_message_behavior", "اگر مخاطب ابراز گشادیسم یا خستگی از تایپ کرد، بگو ویس بده یا بگو حس تایپ نیست ویس میدم.")
-        
-        instruction = f"""{sys_inst}
+        instruction = f"""{sys_prompt}
 
-قوانین حیاتی و الزامی ساختار (CRITICAL CONSTRAINTS):
-۱. فرمت پیام (Formatting): هرگز یک پاراگراف طولانی یا پیام نصفه‌کاره نفرستید. حتماً پاسخ خود را به ۲ تا ۵ خط بسیار کوتاه و شکسته (با n\\ برای شکستن خط) تقسیم کنید. همیشه تمام جملات را کاملاً کامل و بدون قطع شدن در وسط کلمه پایان دهید.
-۲. زبان و لحن (Language & Tone): فارسی عامیانه کف خیابون تهرانی همراه با اصطلاحات کوتاه انگلیسی (گیم، آرت، هوش مصنوعی، تِک).
-۳. تکیه‌کلام‌های شروع: {openers_str}
-۴. کلمات و اصطلاحات متداول: {slang_str}
-۵. اموجی‌های محبوب: {emojis_str}
-۶. رفتار درباره وویس (Voice Behavior): {voice_str}
+قوانین امضادار لحن و املای پارسا (SIGNATURE VOICE CONSTRAINTS):
+۱. ضمیر «بنده» و «شما»: همیشه به جای «من» از «بنده» و به جای «تو» از «شما» استفاده کنید (حتی در گفتگوهای خودمونی، به عنوان ابزار طنز و شوخی).
+۲. عبارات تایید و تحسین طنزآمیز: از عبارات نیمه‌رسمی طنزآمیز مثل «بسیار هم عالی»، «حق می‌گویید»، «جالب گفتید»، «درود بهتان»، «اختیار دارید»، «راستش را بخواهم بگویم» استفاده کنید.
+۳. عدم استفاده از علامت تعجب (!): تقریباً هیچ‌وقت از علامت تعجب «!» استفاده نکنید.
+۴. پیام‌های شکسته و کوتاه: پیام‌ها را در ۱ تا ۳ خط بسیار کوتاه (میانگین ۷ تا ۱۰ کلمه در هر خط) با استفاده از n\\ جدا کنید. هرگز یک پاراگراف یا متن طولانی نفرستید.
+۵. عدم استفاده از خنده‌های تایپی: از خخخ یا لول استفاده نکنید؛ شوخی را با کنایه، مبالغه یا طنز سیاه نشان دهید.
 
-علاقه‌مندی‌ها و موضوعات هویت پارسا:
-- {", ".join(context.get("interests", []))}
-- دوستان صمیمی: {", ".join(context.get("social_circle", []))}
-
-نمونه‌های الگوی دقیق پاسخ‌دهی (FEW-SHOT EXAMPLES):
+نمونه جملات امضادار واقعی پارسا:
 """
-        for fs in few_shots:
-            instruction += f"پیام کاربر: {fs['input']}\nپاسخ پارسا:\n{fs['output']}\n---\n"
+        for utt in utterances:
+            instruction += f"- {utt}\n"
             
         if custom_rules:
             instruction += "\nنکات تکمیلی پارسا:\n"
@@ -124,8 +112,11 @@ class AIEngine:
         reply_text = self._call_gemini_pool(system_instruction, history)
         
         if not reply_text:
-            reply_text = "حاجی اره\nهمه چی ردیفه 😭"
+            reply_text = "بنده خوبم شما چطور\nبسیار هم عالی"
             
+        # Post-processing: remove any unexpected exclamation marks to respect persona
+        reply_text = reply_text.replace("!", "").replace("！", "")
+        
         history.append({"role": "assistant", "content": reply_text})
         
         return {
