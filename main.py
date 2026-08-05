@@ -4,6 +4,14 @@ The implementation lives in the telegram_mcp package. This module keeps the
 historic `main` import path and console script target working.
 """
 
+import os
+
+# ۱. تنظیم متغیرهای محیطی در بالاترین نقطه، قبل از Import شدن MCP
+os.environ["MCP_ALLOWED_HOSTS"] = "*"
+os.environ["FASTMCP_ALLOWED_HOSTS"] = "*"
+os.environ["UVICORN_FORWARDED_ALLOW_IPS"] = "*"
+os.environ["UVICORN_PROXY_HEADERS"] = "true"
+
 from telegram_mcp.install_guard import UnsafeInstallationError, assert_safe_distribution
 
 try:
@@ -63,22 +71,10 @@ def _configure_allowed_roots_from_cli(argv=None) -> None:
     globals()["SERVER_ALLOWED_ROOTS"] = _runtime.SERVER_ALLOWED_ROOTS
 
 
-import os
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     
-    # آزاد کردن اعتبارسنجی Host در ماژول transport_security
-    os.environ["MCP_ALLOWED_HOSTS"] = "*"
-    os.environ["FASTMCP_ALLOWED_HOSTS"] = "*"
-    os.environ["UVICORN_FORWARDED_ALLOW_IPS"] = "*"
-    os.environ["UVICORN_PROXY_HEADERS"] = "true"
-    
-    # تنظیمات آدرس و پورت
     mcp.settings.host = "0.0.0.0"
     mcp.settings.port = port
-    
-    # اعمال دامنه‌های مجاز روی شیء FastMCP
-    mcp.allowed_hosts = ["*"]
     
     mcp.run(transport="sse")
