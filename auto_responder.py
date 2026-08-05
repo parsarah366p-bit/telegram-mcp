@@ -16,22 +16,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 API_ID = int(os.getenv("TELEGRAM_API_ID", "2040"))
 API_HASH = os.getenv("TELEGRAM_API_HASH", "b18441a1ff607e10a989891a5462e627")
-
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "").strip()
+SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "1BJWap1wBu4oTg0SFOlpTZLyWI00A-UQBrsjS8HzF61eatoOUfAzkUbiYA8u8_qfzggDQBUMjVX9coEZ4AvVCu8M5Q_YRrsQDJuj6PefaZOTpr_QMLZ5PdOfuJRrh7-wwD34_jh_MU1xsQmXZ7WCgO84mDRMh5_nqGyx2m4eBDXM0qSPJUdARhfnC7ea_Orm4lA0Fpb5h57S6hRsdNiw0DGMChAh7G67kkpAXtWWYabi7lrwidhYIvdxXONS6CyfIhtXDJMJ3fbVQ6fLsBEtKxxQsN-DFk2b53D0poN04EvG5_q91vSLW7PG78fvqkgqT8fwvLC9ZRm8haEcEaaAK-cpHKRgtf7M=").strip()
 
 ADMIN_USERNAME = "lirph"
 ADMIN_USER_ID = 588588275
 
 ai_engine = AIEngine(knowledge_base_path="knowledge_base.json")
 
-# Initialize client based on available credentials
-if BOT_TOKEN:
-    logging.info("🤖 Mode: Official Telegram Bot Token")
-    client = TelegramClient("bot_session", API_ID, API_HASH)
-else:
-    logging.info("👤 Mode: User Account StringSession")
-    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+# Configure Telethon as a standard Telegram Desktop Linux Client for maximum stability on Railway
+client = TelegramClient(
+    StringSession(SESSION_STRING),
+    API_ID,
+    API_HASH,
+    device_model="Telegram Desktop",
+    system_version="Linux 6.1.0",
+    app_version="4.16.6 Z",
+    lang_code="en",
+    system_lang_code="en-US"
+)
 
 stats = {
     "start_time": datetime.now(),
@@ -45,21 +47,17 @@ async def _connect_with_retry(client):
     while True:
         attempt += 1
         try:
-            if BOT_TOKEN:
-                await client.start(bot_token=BOT_TOKEN)
+            await client.connect()
+            if await client.is_user_authorized():
+                logging.info(f"✅ Telethon connected successfully on attempt {attempt}")
                 return True
-            else:
-                await client.connect()
-                if await client.is_user_authorized():
-                    return True
         except AuthKeyDuplicatedError:
-            delay = min(3 * attempt, 20)
-            logging.warning(f"Session lock collision (attempt {attempt}). Retrying in {delay}s...")
+            logging.warning(f"Session lock collision (attempt {attempt}). Disconnecting & retrying in 10s...")
             try:
                 await client.disconnect()
             except Exception:
                 pass
-            await asyncio.sleep(delay)
+            await asyncio.sleep(10)
         except Exception as e:
             logging.error(f"Connect error (attempt {attempt}): {e}")
             await asyncio.sleep(5)
@@ -163,22 +161,22 @@ async def handle_client_dm(event):
 
 async def main():
     print("=" * 60)
-    print(f"🤖 Autonomous 24/7 AI Handler Bot (Admin: @{ADMIN_USERNAME})")
+    print(f"🤖 Personal Account AI Handler (User: @{ADMIN_USERNAME})")
     print("=" * 60)
     
     await _connect_with_retry(client)
         
     me = await client.get_me()
-    print(f"✅ Successfully connected to Telegram as {me.first_name} (@{me.username})")
-    print(f"🟢 Listening for incoming DMs. Admin alerts configured for @{ADMIN_USERNAME}.")
+    print(f"✅ Connected to Telegram as {me.first_name} (@{me.username})")
+    print(f"🟢 Listening for client DMs 24/7.")
     
     while True:
         try:
             await client.run_until_disconnected()
             break
         except AuthKeyDuplicatedError:
-            logging.warning("AuthKeyDuplicatedError during update loop. Reconnecting in 5s...")
-            await asyncio.sleep(5)
+            logging.warning("AuthKeyDuplicatedError during update loop. Reconnecting in 10s...")
+            await asyncio.sleep(10)
             await _connect_with_retry(client)
         except Exception as loop_err:
             logging.error(f"Loop error: {loop_err}")
