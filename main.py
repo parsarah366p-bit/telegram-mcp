@@ -1,6 +1,12 @@
 import os
 import sys
 
+os.environ["MCP_TRANSPORT"] = os.getenv("MCP_TRANSPORT", "sse")
+os.environ["MCP_HOST"] = os.getenv("MCP_HOST", "0.0.0.0")
+
+if "PORT" in os.environ:
+    os.environ["MCP_PORT"] = os.environ["PORT"]
+
 os.environ["MCP_ALLOWED_HOSTS"] = "*"
 os.environ["FASTMCP_ALLOWED_HOSTS"] = "*"
 os.environ["ALLOWED_HOSTS"] = "*"
