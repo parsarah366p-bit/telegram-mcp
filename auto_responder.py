@@ -9,6 +9,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+from telethon.errors import AuthKeyDuplicatedError
 from ai_engine import AIEngine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -32,6 +33,28 @@ stats = {
     "recent_escalations": []
 }
 
+async def _connect_with_retry(client, max_attempts=6):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await client.connect()
+            if await client.is_user_authorized():
+                return True
+        except AuthKeyDuplicatedError:
+            if attempt >= max_attempts:
+                raise
+            delay = min(2**attempt, 12)
+            logging.warning(f"Session busy on another IP (attempt {attempt}/{max_attempts}). Retrying in {delay}s...")
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            await asyncio.sleep(delay)
+        except Exception as e:
+            if attempt >= max_attempts:
+                raise
+            await asyncio.sleep(3)
+    return False
+
 @client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
 async def handle_client_dm(event):
     sender = await event.get_sender()
@@ -53,7 +76,6 @@ async def handle_client_dm(event):
     if sender_id == ADMIN_USER_ID or username == ADMIN_USERNAME:
         logging.info(f"Admin @{ADMIN_USERNAME} command received: '{message_text}'")
         
-        # Build Admin Status Report
         uptime = datetime.now() - stats["start_time"]
         hours, remainder = divmod(int(uptime.total_seconds()), 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -98,11 +120,9 @@ async def handle_client_dm(event):
         needs_escalation = ai_result["needs_escalation"]
         reason = ai_result["reason"]
         
-        # Reply to client
         await event.reply(reply)
         logging.info(f"Replied to client @{username}: {reply}")
         
-        # Trigger Escalation Alert directly to Admin @lirph
         if needs_escalation:
             stats["escalations_count"] += 1
             stats["recent_escalations"].append({
@@ -135,11 +155,23 @@ async def main():
     print(f"🤖 Autonomous 24/7 AI Client Handler Bot (Admin: @{ADMIN_USERNAME})")
     print("=" * 60)
     
-    await client.start()
+    connected = await _connect_with_retry(client)
+    if not connected:
+        logging.error("Failed connecting to Telegram after retries.")
+        return
+        
     me = await client.get_me()
     print(f"✅ Successfully connected to Telegram as {me.first_name} (@{me.username})")
     print(f"🟢 Listening for incoming client DMs. Admin alerts configured for @{ADMIN_USERNAME}.")
-    await client.run_until_disconnected()
+    
+    while True:
+        try:
+            await client.run_until_disconnected()
+            break
+        except AuthKeyDuplicatedError:
+            logging.warning("AuthKeyDuplicatedError during update loop. Reconnecting in 5s...")
+            await asyncio.sleep(5)
+            await _connect_with_retry(client)
 
 if __name__ == "__main__":
     asyncio.run(main())
