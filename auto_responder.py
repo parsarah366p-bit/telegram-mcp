@@ -76,6 +76,12 @@ async def handle_client_dm(event):
         
         if not message_text:
             return
+
+        # 👁️ Mark incoming message as SEEN (Read double checkmark)
+        try:
+            await event.mark_read()
+        except Exception as read_err:
+            logging.warning(f"Failed to mark read: {read_err}")
             
         uptime = datetime.now() - stats["start_time"]
         hours, remainder = divmod(int(uptime.total_seconds()), 3600)
@@ -137,7 +143,17 @@ async def handle_client_dm(event):
                 return
             
             # Conversational Executive AI Response for Admin
-            async with client.action(event.chat_id, "typing"):
+            try:
+                async with client.action(event.input_chat, 'typing'):
+                    stats_summary = {
+                        "uptime": uptime_str,
+                        "total_messages": stats["total_messages"],
+                        "escalations_count": stats["escalations_count"],
+                        "recent_escalations": stats["recent_escalations"]
+                    }
+                    admin_reply = ai_engine.generate_admin_response("پارسا", message_text, stats_summary)
+                    await event.reply(admin_reply)
+            except Exception:
                 stats_summary = {
                     "uptime": uptime_str,
                     "total_messages": stats["total_messages"],
@@ -146,7 +162,7 @@ async def handle_client_dm(event):
                 }
                 admin_reply = ai_engine.generate_admin_response("پارسا", message_text, stats_summary)
                 await event.reply(admin_reply)
-                return
+            return
 
         # ==========================================
         # 🤖 CLIENT DM HANDLER (Gemini AI Engine)
@@ -154,42 +170,50 @@ async def handle_client_dm(event):
         stats["total_messages"] += 1
         logging.info(f"Received Client DM from {sender_name} (@{username}): {message_text}")
         
-        async with client.action(event.chat_id, "typing"):
-            await asyncio.sleep(1.2)
-            
+        # 💬 Display live "typing..." header state for client
+        try:
+            async with client.action(event.input_chat, 'typing'):
+                await asyncio.sleep(1.5)
+                ai_result = ai_engine.generate_response(sender_id, sender_name, message_text)
+                reply = ai_result["reply"]
+                needs_escalation = ai_result["needs_escalation"]
+                reason = ai_result["reason"]
+                
+                await event.reply(reply)
+                logging.info(f"Replied to client @{username}: {reply}")
+        except Exception as typing_err:
+            logging.warning(f"Typing action fallback: {typing_err}")
             ai_result = ai_engine.generate_response(sender_id, sender_name, message_text)
             reply = ai_result["reply"]
             needs_escalation = ai_result["needs_escalation"]
             reason = ai_result["reason"]
-            
             await event.reply(reply)
-            logging.info(f"Replied to client @{username}: {reply}")
             
-            if needs_escalation:
-                stats["escalations_count"] += 1
-                stats["recent_escalations"].append({
-                    "name": sender_name,
-                    "username": f"@{username}" if username else f"ID {sender_id}",
-                    "text": message_text,
-                    "reason": reason,
-                    "time": datetime.now().strftime("%H:%M:%S")
-                })
-                
-                alert_text = (
-                    f"🚨 **HUMAN ESCALATION ALERT FOR ADMIN @{ADMIN_USERNAME}**\n\n"
-                    f"👤 **Client Name**: {sender_name}\n"
-                    f"🔗 **Username**: @{username}\n"
-                    f"💬 **Client Message**: `{message_text}`\n"
-                    f"⚠️ **Trigger Reason**: {reason}\n"
-                    f"🤖 **Bot AI Reply Sent**: `{reply}`"
-                )
-                
-                try:
-                    admin_entity = await client.get_entity(ADMIN_USERNAME)
-                    await client.send_message(admin_entity, alert_text)
-                    logging.info(f"Escalation alert sent to Admin @{ADMIN_USERNAME}")
-                except Exception as esc_err:
-                    logging.error(f"Failed sending escalation alert: {esc_err}")
+        if needs_escalation:
+            stats["escalations_count"] += 1
+            stats["recent_escalations"].append({
+                "name": sender_name,
+                "username": f"@{username}" if username else f"ID {sender_id}",
+                "text": message_text,
+                "reason": reason,
+                "time": datetime.now().strftime("%H:%M:%S")
+            })
+            
+            alert_text = (
+                f"🚨 **HUMAN ESCALATION ALERT FOR ADMIN @{ADMIN_USERNAME}**\n\n"
+                f"👤 **Client Name**: {sender_name}\n"
+                f"🔗 **Username**: @{username}\n"
+                f"💬 **Client Message**: `{message_text}`\n"
+                f"⚠️ **Trigger Reason**: {reason}\n"
+                f"🤖 **Bot AI Reply Sent**: `{reply}`"
+            )
+            
+            try:
+                admin_entity = await client.get_entity(ADMIN_USERNAME)
+                await client.send_message(admin_entity, alert_text)
+                logging.info(f"Escalation alert sent to Admin @{ADMIN_USERNAME}")
+            except Exception as esc_err:
+                logging.error(f"Failed sending escalation alert: {esc_err}")
 
     except Exception as e:
         logging.error(f"Error in handle_client_dm: {e}", exc_info=True)
