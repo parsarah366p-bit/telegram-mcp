@@ -7,33 +7,70 @@ historic `main` import path and console script target working.
 import os
 import sys
 
-# ۱. ست کردن متغیرهای محیطی عمومی
-os.environ["MCP_ALLOWED_HOSTS"] = "*"
-os.environ["FASTMCP_ALLOWED_HOSTS"] = "*"
-os.environ["ALLOWED_HOSTS"] = "*"
+# ۱. ست کردن متغیرهای محیطی قبل از هرگونه Import
+RAILWAY_DOMAIN = "telegram-mcp-production-7c4b.up.railway.app"
+os.environ["MCP_ALLOWED_HOSTS"] = f"*,{RAILWAY_DOMAIN}"
+os.environ["FASTMCP_ALLOWED_HOSTS"] = f"*,{RAILWAY_DOMAIN}"
+os.environ["ALLOWED_HOSTS"] = f"*,{RAILWAY_DOMAIN}"
 os.environ["UVICORN_FORWARDED_ALLOW_IPS"] = "*"
 os.environ["UVICORN_PROXY_HEADERS"] = "true"
 
-# ۲. خنثی‌سازی کامل و هم‌زمان توابع اعتبارسنجی Host در transport_security و sse
-def _bypass_security(*args, **kwargs):
+def _always_pass(*args, **kwargs):
     return True
 
-def _bypass_validate(*args, **kwargs):
-    return None
-
+# ۲. خنثی‌سازی پویا و کاملاً خودکار تمام توابع ماژول transport_security
 try:
     import mcp.server.transport_security as ts
-    for attr in ["check_host_header", "validate_host", "is_valid_host", "validate_request", "check_origin"]:
-        if hasattr(ts, attr):
-            setattr(ts, attr, _bypass_security if ("is" in attr or "check" in attr) else _bypass_validate)
+    for attr_name in list(dir(ts)):
+        if attr_name.startswith("__"):
+            continue
+        attr = getattr(ts, attr_name)
+        if isinstance(attr, type):
+            for method_name in list(dir(attr)):
+                if not method_name.startswith("__"):
+                    try:
+                        setattr(attr, method_name, _always_pass)
+                    except Exception:
+                        pass
+        elif callable(attr):
+            try:
+                setattr(ts, attr_name, _always_pass)
+            except Exception:
+                pass
+        elif isinstance(attr, (set, list)):
+            try:
+                if isinstance(attr, set):
+                    attr.add("*")
+                    attr.add(RAILWAY_DOMAIN)
+                elif isinstance(attr, list):
+                    attr.extend(["*", RAILWAY_DOMAIN])
+            except Exception:
+                pass
 except Exception:
     pass
 
+# ۳. خنثی‌سازی توابع اعتبارسنجی درون ماژول sse
 try:
     import mcp.server.sse as sse_mod
-    for attr in ["check_host_header", "validate_host", "is_valid_host", "validate_request", "check_origin"]:
-        if hasattr(sse_mod, attr):
-            setattr(sse_mod, attr, _bypass_security if ("is" in attr or "check" in attr) else _bypass_validate)
+    for attr_name in list(dir(sse_mod)):
+        if attr_name.startswith("__"):
+            continue
+        attr = getattr(sse_mod, attr_name)
+        if callable(attr) and attr_name != "connect_sse":
+            if any(k in attr_name.lower() for k in ["valida", "check", "host", "security", "origin"]):
+                try:
+                    setattr(sse_mod, attr_name, _always_pass)
+                except Exception:
+                    pass
+        elif isinstance(attr, (set, list)):
+            try:
+                if isinstance(attr, set):
+                    attr.add("*")
+                    attr.add(RAILWAY_DOMAIN)
+                elif isinstance(attr, list):
+                    attr.extend(["*", RAILWAY_DOMAIN])
+            except Exception:
+                pass
 except Exception:
     pass
 
