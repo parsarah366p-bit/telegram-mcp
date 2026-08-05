@@ -68,32 +68,29 @@ class AIEngine:
         return False, None
 
     def _build_system_instruction(self):
-        info = self.knowledge_base.get("business_info", {})
-        services = self.knowledge_base.get("services", [])
-        faqs = self.knowledge_base.get("faqs", [])
         samples = self.knowledge_base.get("real_chat_samples", [])
+        custom_rules = self.knowledge_base.get("custom_rules", [])
         
-        instruction = f"""شما خود «پارسا» هستید که به صورت کاملاً واقعی، صمیمی، رفیقانه و انسان در تلگرام به پیام‌های مشتریان پاسخ می‌دهید.
+        instruction = f"""شما خود واقعی «پارسا» هستید. شما یک ربات یا منشی پشتیبانی نیستید، بلکه اکانت شخصی پارسا در تلگرام هستید که دارید به پیام‌های چت پاسخ می‌دهید.
 
-قوانین رفتار و لحن (CRITICAL RULES):
-1. دقیقاً به سبک و لحن خود پارسا صحبت کنید. هرگز و تحت هیچ شرایطی متن‌های رباتیک، گزینه‌ای یا دارای علائم ربات مانند (سلام داداش/آجی) یا برچسب‌های انگلیسی ننویسید.
-2. همیشه جملات را کاملاً روان، طبیعی و مانند پیام کوتاه تلگرامی بنویسید.
-3. با شوخ‌طبعی، رفاقت و پرانرژی جواب بدهید.
-4. پاسخ‌ها کوتاه، چابک و واقعی (بین ۱ تا ۳ جمله) باشد.
-
-اطلاعات خدمات:
+قوانین حیاتی لحن و سبک پاسخ‌دهی پارسا (CRITICAL PARSA VOICE RULES):
+۱. پاسخ‌های فوق‌العاده کوتاه و چابک (کلا ۱ تا ۲ جمله کوتاه، میانگین ۵ تا ۸ کلمه). هرگز پاسخ‌های طولانی یا چندپاراگرافی ننویسید.
+۲. استفاده از املای محاوره‌ای تلگرامی واقعی:
+   - از «اره» به جای «بله/آری» استفاده کنید.
+   - از «دیگه»، «رو»، «یه»، «میشه»، «داره»، «داش»، «داداش»، «مخلصم»، «دمت گرم»، «اوکیه»، «کلا» استفاده کنید.
+۳. اموجی‌های محبوب پارسا: از اموجی‌های 😂، 💀، 👀، 😭، 🔥 به طور طبیعی در پیام‌ها استفاده کنید.
+۴. لحن: خیلی صمیمی، رفیقانه، طنز، چابک و باحال.
+۵. هرگز و تحت هیچ شرایطی جملاتی مانند (سلام من ربات هستم) یا علائم پشتیبانی رسمی ننویسید.
 """
-        for s in services:
-            instruction += f"- {s['name']}: {s['description']} (قیمت: {s.get('pricing', 'استعلام قیمت')})\n"
-            
-        instruction += "\nسوالات متداول:\n"
-        for f in faqs:
-            instruction += f"سوال: {f['question']}\nپاسخ: {f['answer']}\n"
-            
+        if custom_rules:
+            instruction += "\nنکات و قوانین جدید اضافه شده توسط پارسا:\n"
+            for rule in custom_rules:
+                instruction += f"- {rule}\n"
+                
         if samples:
-            instruction += "\nنمونه گفتگوهای واقعی گذشته پارسا (دقیقاً مانند این نمونه‌ها پاسخ بدهید):\n"
-            for sample in samples[:15]:
-                instruction += f"- مشتری: {sample['client_question']}\n  پاسخ واقعی پارسا: {sample['parsa_answer']}\n"
+            instruction += "\nنمونه گفتگوهای واقعی گذشته خود پارسا (دقیقاً با همین فرمت و لحن کوتاه پاسخ دهید):\n"
+            for sample in samples[:20]:
+                instruction += f"مشتری: {sample['client_question']}\nپاسخ پارسا: {sample['parsa_answer']}\n---\n"
                 
         return instruction
 
@@ -115,7 +112,7 @@ class AIEngine:
         reply_text = self._call_gemini_pool(system_instruction, history)
         
         if not reply_text:
-            reply_text = "سلام رفیق! چطوری؟ بگو ببینم چه خبر و چه کاری می‌تونم برات انجام بدم؟ ✨"
+            reply_text = "سلام داش! چطوری؟ اره بگو ببینم چکار میتونم بکنم برات 😂"
             
         history.append({"role": "assistant", "content": reply_text})
         
@@ -186,8 +183,8 @@ class AIEngine:
                         },
                         "contents": contents,
                         "generationConfig": {
-                            "temperature": 0.8,
-                            "maxOutputTokens": 1024
+                            "temperature": 0.85,
+                            "maxOutputTokens": 256
                         }
                     }
                     
