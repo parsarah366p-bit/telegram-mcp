@@ -30,7 +30,7 @@ class AIEngine:
         else:
             self.gemini_keys = [base64.b64decode(k.encode()).decode() for k in _DEFAULT_B64_KEYS]
             
-        self.models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-1.5-flash"]
+        self.models = ["gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]
         self.current_key_idx = 0
         
         # Per-user conversation memory
