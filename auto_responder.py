@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import io
+import json
 import logging
 from datetime import datetime
 
@@ -76,7 +77,6 @@ async def handle_client_dm(event):
         if not message_text:
             return
             
-        # Compute live uptime string
         uptime = datetime.now() - stats["start_time"]
         hours, remainder = divmod(int(uptime.total_seconds()), 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -88,6 +88,27 @@ async def handle_client_dm(event):
         if sender_id == ADMIN_USER_ID or username == ADMIN_USERNAME:
             logging.info(f"Admin @{ADMIN_USERNAME} message: '{message_text}'")
             
+            # Interactive Teaching Command: /learn
+            if message_text.lower().startswith("/learn"):
+                content = message_text[6:].strip()
+                if not content:
+                    await event.reply("💡 **راهنمای آموزش ربات**:\nپیام خود را به این صورت ارسال کنید:\n`/learn سوال | پاسخ` یا `/learn متن یادگیری`")
+                    return
+                    
+                kb_path = "knowledge_base.json"
+                kb_data = ai_engine.knowledge_base
+                if "custom_rules" not in kb_data:
+                    kb_data["custom_rules"] = []
+                    
+                kb_data["custom_rules"].append(content)
+                
+                with open(kb_path, "w", encoding="utf-8") as f:
+                    json.dump(kb_data, f, ensure_ascii=False, indent=2)
+                    
+                ai_engine.knowledge_base = kb_data
+                await event.reply(f"✅ **با موفقیت به هوش مصنوعی اضافه شد!**\n\n📌 *نکته جدید ثبت شده*:\n`{content}`")
+                return
+
             # Explicit Telemetry Dashboard Slash Commands
             if message_text.lower() in ["/report", "/stats", "/dashboard"]:
                 active_chats = len(ai_engine.conversations)
@@ -110,7 +131,7 @@ async def handle_client_dm(event):
                 else:
                     report_text += "✨ No pending client escalation alerts.\n"
                     
-                report_text += "\n💡 *Chat naturally anytime to ask questions, request summaries, or discuss business!*"
+                report_text += "\n💡 *Chat naturally anytime or use `/learn` to teach new answers!*"
                 
                 await event.reply(report_text)
                 return
