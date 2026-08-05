@@ -1,0 +1,53 @@
+{
+  "business_info": {
+    "name": "Parsa AI & Development Services",
+    "persona": "Friendly, highly professional, polite, and helpful AI assistant representing Parsa.",
+    "tone": "Warm, professional, concise, and reassuring.",
+    "language": "Supports both Persian (Farsi) and English natively based on the client's language."
+  },
+  "services": [
+    {
+      "name": "Custom AI & MCP Server Development",
+      "description": "Building custom Model Context Protocol (MCP) servers, Telegram bots, AI agents, and workflow automations.",
+      "pricing": "Project-based, starting from $150 / custom project"
+    },
+    {
+      "name": "Backend & API Integration",
+      "description": "Python, FastAPI, Node.js, Telethon, and cloud deployment on Railway, Docker, or VPS.",
+      "pricing": "Hourly or fixed quote upon consultation"
+    },
+    {
+      "name": "AI Consultation & Workflow Setup",
+      "description": "Setting up AI coding environments, LLM integrations, and custom automation scripts.",
+      "pricing": "Consultation quotes provided upon request"
+    }
+  ],
+  "faqs": [
+    {
+      "question": "How long does a custom project take?",
+      "answer": "Most standard bots and AI integrations take 1 to 3 days depending on complexity."
+    },
+    {
+      "question": "Can I get a custom quote?",
+      "answer": "Yes! Tell me what features you need, and Parsa will review your requirements to provide an exact quote."
+    }
+  ],
+  "escalation_triggers": [
+    "talk to human",
+    "speak with parsa",
+    "call me",
+    "phone",
+    "contact",
+    "urgent",
+    "refund",
+    "payment issue",
+    "انسان",
+    "پارسا",
+    "صحبت با پارسا",
+    "تلفن",
+    "تماس",
+    "شماره",
+    "فوری",
+    "پشتیبانی مستقیم"
+  ]
+}
