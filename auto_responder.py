@@ -16,16 +16,23 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 API_ID = int(os.getenv("TELEGRAM_API_ID", "2040"))
 API_HASH = os.getenv("TELEGRAM_API_HASH", "b18441a1ff607e10a989891a5462e627")
-SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "1BJWap1wBu8UVcUKfLQ-OHYoNv38blOOuz6atwTkJZ8k2djH71VCwi0pqL3fojoi4Y66-2UO06s1ov1bcHKazh35xVcakvhX9vqe3nWE60O83x2sdGSv_WsDdsxmTqX_K2zImBMyloWHYmW4X7OYZ2XN7ysntMGDw6l4orFGyGduF_xIKC_T8odDXNWf01BIypfyt4tkGvZlDj7VdX_ii1fwMzA6brj5Lpsyzcu6ITt2uCgTdXIfPBcK4MN-RpkA6w91qNik7L-WFW9dHkbzI9R-f3vRXjYT6C3hHWA9ILFgbf0oVlf61uk9-E-vSatgBFl74q0ksCAvuw349EMby_E-CJ_NkTTc=")
+
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "").strip()
 
 ADMIN_USERNAME = "lirph"
 ADMIN_USER_ID = 588588275
 
-# Initialize AI Engine
 ai_engine = AIEngine(knowledge_base_path="knowledge_base.json")
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-# Analytics & Admin Metrics
+# Initialize client based on available credentials
+if BOT_TOKEN:
+    logging.info("🤖 Mode: Official Telegram Bot Token")
+    client = TelegramClient("bot_session", API_ID, API_HASH)
+else:
+    logging.info("👤 Mode: User Account StringSession")
+    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+
 stats = {
     "start_time": datetime.now(),
     "total_messages": 0,
@@ -38,19 +45,23 @@ async def _connect_with_retry(client):
     while True:
         attempt += 1
         try:
-            await client.connect()
-            if await client.is_user_authorized():
+            if BOT_TOKEN:
+                await client.start(bot_token=BOT_TOKEN)
                 return True
+            else:
+                await client.connect()
+                if await client.is_user_authorized():
+                    return True
         except AuthKeyDuplicatedError:
-            delay = min(2 * attempt, 15)
-            logging.warning(f"Session lock active on another replica (attempt {attempt}). Retrying in {delay}s...")
+            delay = min(3 * attempt, 20)
+            logging.warning(f"Session lock collision (attempt {attempt}). Retrying in {delay}s...")
             try:
                 await client.disconnect()
             except Exception:
                 pass
             await asyncio.sleep(delay)
         except Exception as e:
-            logging.error(f"Connect attempt {attempt} error: {e}")
+            logging.error(f"Connect error (attempt {attempt}): {e}")
             await asyncio.sleep(5)
 
 @client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
@@ -141,7 +152,6 @@ async def handle_client_dm(event):
                 )
                 
                 try:
-                    await client.send_message("me", alert_text)
                     admin_entity = await client.get_entity(ADMIN_USERNAME)
                     await client.send_message(admin_entity, alert_text)
                     logging.info(f"Escalation alert sent to Admin @{ADMIN_USERNAME}")
@@ -153,14 +163,14 @@ async def handle_client_dm(event):
 
 async def main():
     print("=" * 60)
-    print(f"🤖 Autonomous 24/7 AI Client Handler Bot (Admin: @{ADMIN_USERNAME})")
+    print(f"🤖 Autonomous 24/7 AI Handler Bot (Admin: @{ADMIN_USERNAME})")
     print("=" * 60)
     
     await _connect_with_retry(client)
         
     me = await client.get_me()
     print(f"✅ Successfully connected to Telegram as {me.first_name} (@{me.username})")
-    print(f"🟢 Listening for incoming client DMs. Admin alerts configured for @{ADMIN_USERNAME}.")
+    print(f"🟢 Listening for incoming DMs. Admin alerts configured for @{ADMIN_USERNAME}.")
     
     while True:
         try:
