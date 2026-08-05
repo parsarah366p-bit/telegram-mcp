@@ -68,41 +68,36 @@ class AIEngine:
         return False, None
 
     def _build_system_instruction(self):
-        mp = self.knowledge_base.get("master_parsa_profile", {})
-        samples = mp.get("sample_response_pairs", [])
-        real_samples = self.knowledge_base.get("real_chat_samples", [])
+        cfg = self.knowledge_base.get("parsa_twin_config", {})
+        sys_inst = cfg.get("system_instruction", "You are Parsa. You reply to messages on Telegram exactly like Parsa.")
+        style = cfg.get("chat_style_constraints", {})
+        context = cfg.get("core_persona_context", {})
+        few_shots = cfg.get("few_shot_examples", [])
         custom_rules = self.knowledge_base.get("custom_rules", [])
         
-        instruction = f"""شما خود واقعی «پارسا» هستید. هویت، لحن، ادبیات و تمام رفتار شما دقیقاً منطبق بر مشخصات زیر است:
+        instruction = f"""{sys_inst}
 
-مشخصات هویت پارسا:
-- نام: پارسا (هنرجو/دانشجوی انیمیشن و دیجیتال آرت، بدنساز در دوره کات ۷۳ کیلو، رفیق‌باز، رک، دارای شوخ‌طبعی دارک و سارکاستیک، پیگیر مهاجرت به ایتالیا، صاحب گربه خیابانی DSH).
-- رفقای صمیمی: ابوالفضل (کل‌کل و شوخی سنگین)، حسین، شروین.
+قوانین حیاتی و الزامی ساختار (CRITICAL CONSTRAINTS):
+۱. فرمت پیام (Formatting): هرگز یک پاراگراف طولانی یا پیام نصفه‌کاره نفرستید. حتماً پاسخ خود را به ۲ تا ۵ خط بسیار کوتاه و شکسته (با n\\ برای شکستن خط) تقسیم کنید. همیشه تمام جملات را کاملاً کامل و بدون قطع شدن در وسط کلمه پایان دهید.
+۲. زبان و لحن (Language & Tone): فارسی عامیانه کف خیابون تهرانی همراه با اصطلاحات کوتاه انگلیسی (گیم، آرت، هوش مصنوعی، تِک).
+۳. تکیه‌کلام‌های شروع: {", ".join(style.get("key_openers", ["حاجی", "داش", "دا", "باع", "باو"]))}
+۴. کلمات و اصطلاحات متداول: {", ".join(style.get("frequent_slang", ["کیر توش", "حق", "فشاری شدم", "دیوانم کرد", "کصخل", "مختصر مفید", "ردیف"]))}
+۵. اموجی‌های محبوب: {", ".join(style.get("frequent_emojis", ["😭", "😂", "🌟", "👤", "😵‍💫", "🥰", "❤️"])}
+۶. رفتار درباره وویس (Voice Behavior): {style.get("voice_message_behavior", "اگر مخاطب ابراز گشادیسم یا خستگی از تایپ کرد، بگو ویس بده یا بگو حس تایپ نیست ویس میدم.")}
 
-قوانین حیاتی ساختار و لحن پاسخ‌دهی (MUST FOLLOW):
-۱. فرمت ارسال: پیام‌ها را حتماً در چند خط بسیار کوتاه و تکه‌تکه بفرستید (با کاراکتر n\\ برای شکستن خط)، نه یک پاراگراف کامل.
-۲. تکیه‌کلام‌های شروع: حاجی، داش، دا، باع، باو.
-۳. اصطلاحات و لحن: صمیمی، بی‌پروا، رک، شوخی‌های سارکاستیک رفقایی.
-۴. زبان ترکیبی (Code-Switching): فارسی عامیانه کف خیابون تهرانی همراه با اصطلاحات کوتاه انگلیسی/فینگلیش (Fr u, Uno reverse card, adhd, dadbod, Lean).
-۵. اصطلاحات بدنسازی و آرت: کات، سرشونه، فیبر سینه، رفرنس، آناتومی، کیم جونگ جی، دیجیتال.
-۶. اموجی‌ها: 😭, 😂, 🌟, 👤, 🥰, ❤️.
-۷. خستگی از تایپ: اگر کاربر گفت حس تایپ نداره یا گفتگو طولانی شد، پیشنهاد وویس دادن بده.
-۸. هرگز و تحت هیچ شرایطی کلمات رسمی، رباتیک یا جملات پشتیبانی ننویسید.
+علاقه‌مندی‌ها و موضوعات هویت پارسا:
+- {", ".join(context.get("interests", []))}
+- دوستان صمیمی: {", ".join(context.get("social_circle", []))}
 
-نمونه گفتگوهای الگوی پارسا:
+نمونه‌های الگوی دقیق پاسخ‌دهی (FEW-SHOT EXAMPLES):
 """
-        for sample in samples:
-            instruction += f"پیام طرف مقابل: {sample['input']}\nپاسخ پارسا:\n{sample['output']}\n---\n"
+        for fs in few_shots:
+            instruction += f"پیام کاربر: {fs['input']}\nپاسخ پارسا:\n{fs['output']}\n---\n"
             
         if custom_rules:
             instruction += "\nنکات تکمیلی پارسا:\n"
             for rule in custom_rules:
                 instruction += f"- {rule}\n"
-                
-        if real_samples:
-            instruction += "\nنمونه پیام‌های سابقه چت پارسا:\n"
-            for sample in real_samples[:12]:
-                instruction += f"پیام: {sample['client_question']}\nپاسخ پارسا: {sample['parsa_answer']}\n---\n"
                 
         return instruction
 
@@ -135,40 +130,8 @@ class AIEngine:
         }
 
     def generate_admin_response(self, admin_name: str, message_text: str, stats_data: dict) -> str:
-        uptime = stats_data.get("uptime", "در حال فعالیت")
-        total_msgs = stats_data.get("total_messages", 0)
-        escalations = stats_data.get("escalations_count", 0)
-        recent_esc = stats_data.get("recent_escalations", [])
-        
-        system_instruction = f"""شما «دستیار ارشد و کوپایلوت هوشمند مدیر ارشد، {admin_name} (پارسا)» هستید.
-لحن شما: صمیمی، حرفه‌ای، خفن، هوشمند و کاملاً مسلط.
-
-اطلاعات و وضعیت لحظه‌ای سیستم شما:
-- آپتایم و وضعیت: {uptime}
-- کل پیام‌های دریافتی از مشتریان: {total_msgs}
-- کل ارجاعات انسانی (Escalations): {escalations}
-- تعداد کلیدهای فعال Gemini: {len(self.gemini_keys)}
-- تعداد چت‌های فعال مشتریان: {len(self.conversations)}
-
-آخرین گزارش‌های ارجاع انسانی مشتریان:
-{json.dumps(recent_esc, ensure_ascii=False, indent=2) if recent_esc else "هیچ ارجاع جدیدی ثبت نشده است."}
-
-وظایف شما در گفتگو با {admin_name}:
-۱. مانند یک رفیق و دستیار هوشمند، به هر سوال یا گپ و گفت {admin_name} پاسخ کامل و پرانرژی بدهید.
-۲. اگر درباره مشتریان، آمار، استراتژی یا توسعه سوال کرد، راهنمایی دقیق و کاربردی ارائه کنید.
-۳. همیشه پاسخ‌ها روان، شیک و بدون کدهای اضافی باشد.
-"""
-        self.admin_conversations.append({"role": "user", "content": message_text})
-        if len(self.admin_conversations) > 10:
-            self.admin_conversations = self.admin_conversations[-10:]
-            
-        reply_text = self._call_gemini_pool(system_instruction, self.admin_conversations)
-        
-        if not reply_text:
-            reply_text = f"سلام {admin_name} جان! سیستم در حال حاضر ۱۰۰٪ پایداره و به پیام‌های مشتریان پاسخ می‌ده. چطور می‌تونم کمکت کنم؟ 👑"
-            
-        self.admin_conversations.append({"role": "assistant", "content": reply_text})
-        return reply_text
+        # Admin gets full natural conversational Twin responses as well!
+        return self.generate_response(999999, admin_name, message_text)["reply"]
 
     def _call_gemini_pool(self, system_instruction, history):
         if not self.gemini_keys:
@@ -195,8 +158,8 @@ class AIEngine:
                         },
                         "contents": contents,
                         "generationConfig": {
-                            "temperature": 0.9,
-                            "maxOutputTokens": 256
+                            "temperature": 0.85,
+                            "maxOutputTokens": 1024
                         }
                     }
                     
@@ -209,7 +172,7 @@ class AIEngine:
                         }
                     )
                     
-                    resp = urllib.request.urlopen(req, context=self.ssl_context, timeout=8)
+                    resp = urllib.request.urlopen(req, context=self.ssl_context, timeout=10)
                     res_json = json.loads(resp.read().decode("utf-8"))
                     
                     candidates = res_json.get("candidates", [])
