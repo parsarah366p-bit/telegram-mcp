@@ -68,8 +68,13 @@ import os
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     
-    # تنظیم آدرس و پورت از طریق تنظیمات FastMCP
+    # تنظیم متغیرهای محیطی FastMCP و آزاد کردن تمام دامنه‌ها
+    os.environ["FASTMCP_HOST"] = "0.0.0.0"
+    os.environ["FASTMCP_PORT"] = str(port)
+    os.environ["FASTMCP_ALLOWED_HOSTS"] = "*"
+    
     mcp.settings.host = "0.0.0.0"
     mcp.settings.port = port
+    mcp.settings.allowed_hosts = ["*"]
     
     mcp.run(transport="sse")
